@@ -673,8 +673,75 @@
 			if (e.data.dataReceived && e.data.dataReceived.overlayNinja) {
 			  addMessageToOverlay(e.data.dataReceived.overlayNinja);
 			}
-		  });
-		});
-	}
-  </script>
+		  <script>
+(() => {
+  const ALPHA = 0.28; // match your normal chat bg alpha
+
+  const parseRGBA = (s) => {
+    if (!s) return null;
+    const m = s.match(/rgba?\(\s*([0-9.]+)\s*,\s*([0-9.]+)\s*,\s*([0-9.]+)(?:\s*,\s*([0-9.]+))?\s*\)/i);
+    if (!m) return null;
+    return { r: +m[1] | 0, g: +m[2] | 0, b: +m[3] | 0 };
+  };
+
+  const setAlpha = (el) => {
+    if (!el) return;
+
+    // Prefer inline style first (Septapus uses inline rgba(...,1))
+    let bg = el.style && el.style.backgroundColor;
+    if (!bg || bg === "transparent") bg = getComputedStyle(el).backgroundColor;
+
+    const rgb = parseRGBA(bg);
+    if (!rgb) return;
+
+    el.style.setProperty(
+      "background-color",
+      `rgba(${rgb.r},${rgb.g},${rgb.b},${ALPHA})`,
+      "important"
+    );
+  };
+
+  const applyAll = (root = document) => {
+    const sels = [
+      // SuperChat (your snippet shows these)
+      "yt-live-chat-paid-message-renderer #header",
+      "yt-live-chat-paid-message-renderer #content",
+
+      // Membership (these vary by build; try all common parts)
+      "yt-live-chat-membership-item-renderer #header",
+      "yt-live-chat-membership-item-renderer #content",
+      "yt-live-chat-membership-item-renderer #card",
+
+      // Paid sticker (varies)
+      "yt-live-chat-paid-sticker-renderer #card",
+      "yt-live-chat-paid-sticker-renderer #content",
+    ];
+
+    for (const sel of sels) {
+      root.querySelectorAll?.(sel).forEach(setAlpha);
+    }
+  };
+
+  // Run now
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => applyAll(document));
+  } else {
+    applyAll(document);
+  }
+
+  // Watch for new messages
+  const mo = new MutationObserver((muts) => {
+    for (const m of muts) {
+      for (const n of m.addedNodes) {
+        if (n && n.querySelectorAll) applyAll(n);
+      }
+    }
+  });
+  mo.observe(document.documentElement, { childList: true, subtree: true });
+
+  // Re-apply periodically (some overlays repaint styles)
+  setInterval(() => applyAll(document), 1500);
+})();
+</script>
 </html>
+
